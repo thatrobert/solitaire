@@ -27,6 +27,7 @@
 body {
   min-width: 300px;
   min-height: 100vh;
+  min-height: 100dvh;
   margin: 0;
   background: radial-gradient(ellipse at 50% 0%, #24243f, transparent 72%),
     repeating-linear-gradient(0deg, transparent 0 3px, #07091532 3px 4px);
@@ -36,7 +37,6 @@ button:disabled { cursor: default; }
 button:focus-visible { outline: 2px dashed var(--gold); outline-offset: 3px; z-index: 1; }
 h1, h2, p { margin: 0; }
 .shell { width: min(620px, calc(100% - 24px)); margin-inline: auto; }
-#app { padding-bottom: 8px; }
 .page-head {
   display: flex;
   justify-content: space-between;
@@ -255,10 +255,12 @@ svg { display: block; width: 100%; height: auto; }
 .powers { padding: 7px; }
 .power-list { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
 .power {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto auto;
+  align-content: center;
   align-items: center;
   justify-content: center;
-  gap: clamp(2px, .7vw, 7px);
+  gap: 1px clamp(2px, .7vw, 7px);
   min-height: 44px;
   width: 100%;
   padding: 3px;
@@ -273,6 +275,7 @@ svg { display: block; width: 100%; height: auto; }
 .power.equip-target { border-style: dashed; border-color: var(--gold); filter: none; }
 .power:hover, .power[aria-expanded="true"] { filter: brightness(1.18); }
 .power-icon { display: grid; place-items: center; flex-shrink: 0; width: clamp(14px, 4.2vw, 24px); color: var(--accent); }
+.power-label { grid-column: 1 / -1; font-size: .72rem; }
 .power-tooltip, .power-popover {
   position: absolute;
   z-index: 3;

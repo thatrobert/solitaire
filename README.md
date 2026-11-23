@@ -17,9 +17,9 @@ Click an exposed matching card. Click the stock or press **D** to draw when need
 
 | Suit | Power | Effect |
 | --- | --- | --- |
-| Str | Grapple | Lower the selected card one rank, wrapping 1/10 to 9. |
-| Int | Tactical | Move an exposed card with another card behind it into the first empty column. |
-| Wis | Perceive | Show the rank and suit of the card immediately behind the selected card. |
+| Str | Strike | Remove the selected exposed card from the tableau, leaving the active card and discard pile alone. |
+| Int | Tactical | Move the top half of the leftmost longest stack into the first empty column, rounding down for odd stacks. |
+| Wis | Perceive | Show the rank and suit of the nearest hidden card in every stack that has one, skipping cards already revealed. |
 | Dex | Equip | Spend 2 Dex energy to give another suit 1 energy. Choose the suit by tapping its icon. |
 | Con | Recover | Restore 1 HP, up to 10. |
 | Chr | Dazzle | Block the guardian's damage on the next draw. |

@@ -1,7 +1,7 @@
 ﻿import './style.css'
 import {
   advance, canMatch, canPower, canTarget, cast, columns, draw, encounters, equip, match, maxHp,
-  newGame, powerCost, powers, rankText, suits,
+  newGame, powerCost, powers, rankText, suits, wrapRanks,
 } from './game.ts'
 import type { Card, Game, Suit, TargetPower } from './game.ts'
 
@@ -66,17 +66,18 @@ function hero() {
 
 function stack(cards: Card[], index: number) {
   const card = cards.at(-1)
-  const below = cards.at(-2)
+  const coveredCards = cards.slice(0, -1)
   const matching = card && canMatch(game, card)
   const eligible = target === 'dex' ? false : target ? canTarget(game, target, index) : matching
-  const revealed = below?.revealed ? ` Behind: ${cardLabel(below)}.` : ''
+  const revealed = coveredCards.filter(card => card.revealed).reverse().map(cardLabel)
+  const revealedLabel = revealed.length ? ` Behind: ${revealed.join(', ')}.` : ''
   return `<div class="stack" style="--depth:${Math.max(0, cards.length - 1)}">
-    ${cards.slice(0, -1).map((covered, depth) =>
+    ${coveredCards.map((covered, depth) =>
       `<div class="card back behind ${covered.revealed ? covered.suit + ' revealed' : ''}" style="--level:${depth}" aria-hidden="true">
         ${covered.revealed ? `<span class="peek">${rankText(covered.rank)}${icon(covered.suit)}</span>` : ''}</div>`).join('')}
     ${card ? `<button class="card face ${card.suit} ${eligible ? target ? 'target' : 'match' : 'muted-card'}"
       data-action="card-${index}" ${eligible ? '' : 'disabled'}
-      aria-label="${target && eligible ? powers[target].name + ': ' : ''}${cardLabel(card)}. Column ${index + 1}, ${cards.length - 1} covered.${revealed}">
+      aria-label="${target && eligible ? powers[target].name + ': ' : ''}${cardLabel(card)}. Column ${index + 1}, ${coveredCards.length} covered.${revealedLabel}">
       ${face(card)}</button>` : `<div class="card vacant" aria-label="Empty column ${index + 1}">◇</div>`}
   </div>`
 }
@@ -99,9 +100,7 @@ function board() {
 
 function targetPrompt(suit: TargetPower | 'dex') {
   const instruction = {
-    str: 'Choose an exposed card to lower by one rank.',
-    int: 'Choose a card with another card behind it to move to the first empty column.',
-    wis: 'Choose a stack to reveal the card immediately behind its exposed card.',
+    str: 'Choose an exposed card to remove.',
     dex: 'Equip: choose another suit icon to give it 1 energy.',
   }
   return instruction[suit]
@@ -130,6 +129,7 @@ function powerBar() {
       return `<div class="power-slot"><button data-action="power-${suit}" class="power ${suit} ${canPower(game, suit) ? 'ready' : ''} ${target === suit ? 'selected' : ''} ${destination ? 'equip-target' : ''}"
         aria-label="${label}" aria-describedby="${equipping ? 'game-notice' : `hint-${suit}`}" aria-expanded="${powerInfo === suit}">
         <span class="power-icon">${icon(suit)}</span><b>${game.energy[suit]}</b>
+        <span class="power-label">${power.label.toUpperCase()}</span>
       </button><div class="power-tooltip" role="tooltip" id="hint-${suit}">${powerDescription(suit)}</div></div>`
     }).join('')}</div>
     ${powerInfo ? `<div class="power-popover" role="group" aria-label="${powers[powerInfo].name}">
@@ -208,9 +208,9 @@ document.addEventListener('click', event => {
   const action = button.dataset.action!
   if (action === 'help') {
     modal('How to play', `<ol>
-      <li>Match exposed cards one rank above or below the active card. The loop runs 8, 9, 1/10, 2, 3. Clear all seven columns to win an encounter.</li>
+      <li>Match exposed cards one rank above or below the active card. ${wrapRanks ? 'The loop runs 8, 9, 1/10, 2, 3.' : 'Ranks run from 1 to 9.'} Clear all seven columns to win an encounter.</li>
       <li>Matching or drawing a card, including the opening card, earns 1 energy of its suit. Each power spends 2 energy of the matching suit. Equip gives another suit 1 energy. Tap that suit’s icon to choose it.</li>
-      <li>Tap a suit to activate its power. Choose an exposed card for Grapple, Tactical, or Perceive. Recover heals 1 HP immediately. Dazzle protects your next draw.</li>
+      <li>Tap a suit to activate its power. Choose an exposed card to remove with Strike. Tactical and Perceive activate immediately. Recover heals 1 HP. Dazzle protects your next draw.</li>
       <li>Every draw breaks your streak and triggers the guardian’s attack. You start the run with 10 HP.</li>
       <li>Each match after the fifth earns gold equal to your current streak minus five.</li>
     </ol><button class="primary" data-action="close">Back to game</button>`)
@@ -258,13 +258,10 @@ document.addEventListener('click', event => {
       target = 'dex'
       return render('power-str')
     }
-    if (suit === 'con' || suit === 'chr') return useActiveAction(cast(game, suit), action)
-    if (suit === 'str' || suit === 'int' || suit === 'wis') {
-      target = suit
-      render()
-      const first = app.querySelector<HTMLButtonElement>('.target')
-      first?.focus()
-    }
+    if (suit !== 'str') return useActiveAction(cast(game, suit), action)
+    target = suit
+    render()
+    app.querySelector<HTMLButtonElement>('.target')?.focus()
   }
 })
 
