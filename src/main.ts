@@ -33,6 +33,9 @@ try {
     const saved = JSON.parse(raw) as Omit<Game, 'gold' | 'dazzled'> & Partial<Pick<Game, 'gold' | 'dazzled'>>
     if (saved.tableau?.length === columns && encounters[saved.stage] && saved.active && saved.spent && saved.energy) {
       game = { ...saved, gold: saved.gold ?? 0, dazzled: saved.dazzled ?? false }
+      game.notice = game.notice.replace(/^Drew .*? energy\. /, '')
+        .replace(/^Matched .*? energy\./, 'Matched.')
+        .replace(/^(Equip spent \d+ Dex) and 1 gold/, '$1').trim()
     }
   }
 } catch { /* A fresh run remains available without storage. */ }
@@ -55,10 +58,7 @@ function hero() {
   const room = encounters[game.stage]
   const image = `${import.meta.env.BASE_URL}${room.art}-pixel.png`
   return `<section class="encounter" style="--scene:url('${image}')" aria-label="Current encounter">
-    <div class="encounter-copy"><div class="overline">${room.place}</div><h2>${room.name}</h2>
-      <div class="progress" aria-label="Encounter ${game.stage + 1} of ${encounters.length}">
-        ${encounters.map((_, index) => `<i class="${index === game.stage ? 'current' : index < game.stage ? 'past' : ''}" aria-hidden="true"></i>`).join('')}
-        Encounter ${game.stage + 1} of ${encounters.length}</div></div>
+    <h2>${game.stage + 1}. ${room.name}</h2>
     ${game.phase === 'battle' ? `<div class="intent ${game.dazzled ? 'protected' : ''}">
       <strong>${game.dazzled ? 'Next draw protected' : `-${room.damage} HP per draw`}</strong></div>` : ''}
   </section>`
@@ -82,17 +82,15 @@ function stack(cards: Card[], index: number) {
 }
 
 function board() {
-  const remaining = game.tableau.reduce((total, pile) => total + pile.length, 0)
   return `<section class="panel board" aria-label="Card table">
-    <div class="panel-title"><h2>Tableau</h2><span class="table-stats"><span>${remaining} card${remaining === 1 ? '' : 's'} left</span>
-      <span class="gold"><span aria-hidden="true">◉</span> <b>${game.gold}</b> gold</span></span></div>
     <div class="tableau" style="--layers:${encounters[game.stage].rows - 1}">${game.tableau.map(stack).join('')}</div>
-    <div class="divider" aria-hidden="true">✦</div>
     <div class="play-area">
-      <div class="streak"><strong>${game.streak}</strong><span>Streak</span></div>
-      <div class="pile"><div class="card face active ${game.active.suit}" role="img" aria-label="Active card: ${cardLabel(game.active)}">${face(game.active)}</div><span>Active card</span></div>
-      <div class="pile"><button class="card back stock" data-action="draw" aria-label="Draw, ${game.stock.length} cards left"
-        ${game.phase === 'battle' && game.stock.length ? '' : 'disabled'}><span aria-hidden="true">✺</span><b>${game.stock.length}</b></button><span>Draw pile</span></div>
+      ${health()}
+      <div class="card face active ${game.active.suit}" role="img" aria-label="Active card: ${cardLabel(game.active)}">${face(game.active)}</div>
+      <button class="card back stock" data-action="draw" aria-label="Draw, ${game.stock.length} cards left"
+        ${game.phase === 'battle' && game.stock.length ? '' : 'disabled'}><span aria-hidden="true">✺</span><b>${game.stock.length}</b></button>
+      <div class="gold-coin" role="img" aria-label="${game.gold} gold">${game.gold}</div>
+      <div class="streak">STREAK <b>${game.streak}/${game.best}</b></div>
     </div>
     <div class="message"><p id="game-notice" class="notice" role="status">${target ? targetPrompt(target) : game.notice}</p>
       ${target ? '<button data-action="cancel-target">Cancel</button>' : ''}</div>
@@ -110,11 +108,9 @@ function targetPrompt(suit: TargetPower | 'dex') {
 }
 
 function health() {
-  return `<section class="panel health" aria-label="Health">
-    <strong>${game.hp}/${maxHp} HP</strong>
-      <div class="health-pips" role="meter" aria-label="Health" aria-valuenow="${game.hp}" aria-valuemin="0" aria-valuemax="${maxHp}">
-        ${Array.from({ length: maxHp }, (_, i) => `<span class="${i < game.hp ? 'filled' : ''}"></span>`).join('')}</div>
-  </section>`
+  return `<div class="health" role="meter" aria-label="HP" aria-valuenow="${game.hp}" aria-valuemin="0" aria-valuemax="${maxHp}">
+    <strong>${game.hp}</strong>
+  </div>`
 }
 
 function powerDescription(suit: Suit) {
@@ -150,8 +146,7 @@ function render(focus?: string) {
     <nav aria-label="Game controls"><button data-action="help">Help</button>
       <button data-action="restart">New run</button></nav>
   </header>
-  <main class="shell">${hero()}${health()}${board()}${powerBar()}</main>
-  <footer class="shell"><span><kbd>D</kbd> or <kbd>Space</kbd> to draw</span><span>Best streak <b>${game.best}</b></span></footer>`
+  <main class="shell">${hero()}${board()}${powerBar()}</main>`
   if (focus) {
     const buttons = Array.from(app.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'))
     const next = buttons.find(button => button.dataset.action === focus) ??
@@ -173,11 +168,11 @@ function modal(title: string, html: string, locked = false) {
 
 function showPhase() {
   if (game.phase === 'clear') {
-    modal('Guardian defeated', `<p>Every column cleared. Recover up to 3 HP and continue to ${encounters[game.stage + 1].place}.</p>
+    modal('Guardian defeated', `<p>Every column cleared. Recover up to 3 HP and face ${encounters[game.stage + 1].name}.</p>
       <button class="primary" data-action="advance">Continue</button>`, true)
   }
   if (game.phase === 'victory') {
-    modal('The gate is open', `<p>You cleared all three encounters. Your longest streak was ${game.best}.</p>
+    modal('The gate is open', `<p>You cleared ${game.stage + 1} encounters. Your longest streak was ${game.best}.</p>
       <button class="primary" data-action="start">Play again</button>`, true)
   }
   if (game.phase === 'defeat') {
@@ -214,7 +209,7 @@ document.addEventListener('click', event => {
   if (action === 'help') {
     modal('How to play', `<ol>
       <li>Match exposed cards one rank above or below the active card. The loop runs 8, 9, 1/10, 2, 3. Clear all seven columns to win an encounter.</li>
-      <li>Matching or drawing a card, including the opening card, earns 1 energy of its suit. Each power spends 2 energy of the matching suit. Equip also spends 1 gold to give another suit 1 energy. Tap that suit’s icon to choose it.</li>
+      <li>Matching or drawing a card, including the opening card, earns 1 energy of its suit. Each power spends 2 energy of the matching suit. Equip gives another suit 1 energy. Tap that suit’s icon to choose it.</li>
       <li>Tap a suit to activate its power. Choose an exposed card for Grapple, Tactical, or Perceive. Recover heals 1 HP immediately. Dazzle protects your next draw.</li>
       <li>Every draw breaks your streak and triggers the guardian’s attack. You start the run with 10 HP.</li>
       <li>Each match after the fifth earns gold equal to your current streak minus five.</li>

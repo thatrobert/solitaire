@@ -7,15 +7,16 @@ export const powers = {
   str: { label: 'Str', name: 'Grapple', detail: 'Lower a card by one rank.' },
   int: { label: 'Int', name: 'Tactical', detail: 'Move a card with another behind it to an empty column.' },
   wis: { label: 'Wis', name: 'Perceive', detail: 'Reveal the card immediately behind.' },
-  dex: { label: 'Dex', name: 'Equip', detail: 'Spend 2 Dex and 1 gold to give another suit 1 energy.' },
+  dex: { label: 'Dex', name: 'Equip', detail: 'Spend 2 Dex to give another suit 1 energy.' },
   con: { label: 'Con', name: 'Recover', detail: 'Restore 1 HP.' },
   chr: { label: 'Chr', name: 'Dazzle', detail: 'Block the guardian’s damage on your next draw.' },
 } as const
 
 export const encounters = [
-  { name: 'The Brass Sentinel', place: 'The Astral Gate', art: 'sentinel', rows: 3, damage: 1 },
-  { name: 'The Tide Keeper', place: 'The Moonlit Reach', art: 'keeper', rows: 4, damage: 2 },
-  { name: 'The Eclipse Regent', place: 'The Last Meridian', art: 'regent', rows: 5, damage: 3 },
+  { name: 'The Brass Sentinel', art: 'sentinel', rows: 4, filledColumns: 5, damage: 1 },
+  { name: 'The Tide Keeper', art: 'keeper', rows: 5, filledColumns: 5, damage: 2 },
+  { name: 'The Eclipse Regent', art: 'regent', rows: 6, filledColumns: 5, damage: 2 },
+  { name: 'The Obsidian Wyrm', art: 'wyrm', rows: 7, filledColumns: 5, damage: 3 },
 ] as const
 
 export type Rank = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
@@ -63,9 +64,14 @@ function deal(stage: number, random: () => number) {
     deck[n] = deck[index]
     deck[index] = card
   }
-  const { rows } = encounters[stage]
-  const tableau = Array.from({ length: columns }, () => deck.splice(0, rows))
-  const firstMatch = deck.findIndex(card => tableau.some(stack => consecutive(card.rank, stack[stack.length - 1].rank)))
+  const { rows, filledColumns } = encounters[stage]
+  const firstFilledColumn = (columns - filledColumns) / 2
+  const tableau = Array.from({ length: columns }, (_, column) =>
+    column >= firstFilledColumn && column < firstFilledColumn + filledColumns ? deck.splice(0, rows) : [],
+  )
+  const firstMatch = deck.findIndex(card => tableau.some(stack =>
+    stack.length > 0 && consecutive(card.rank, stack[stack.length - 1].rank),
+  ))
   const [active] = deck.splice(firstMatch < 0 ? 0 : firstMatch, 1)
   const energy = { str: 0, int: 0, wis: 0, dex: 0, con: 0, chr: 0 }
   energy[active.suit]++
@@ -106,7 +112,7 @@ export function canPower(game: Game, suit: Suit) {
     case 'int': return hasTacticalMove(game)
     case 'wis': return game.tableau.some(stack => stack.length > 1 && !stack[stack.length - 2].revealed)
     case 'con': return game.hp < maxHp
-    case 'dex': return game.gold >= 1
+    case 'dex': return true
     case 'chr': return !game.dazzled && game.stock.length > 0
   }
 }
@@ -120,7 +126,7 @@ export function canTarget(game: Game, suit: TargetPower, column: number) {
 }
 
 function settle(game: Game) {
-  const trades = Math.min(game.gold, Math.floor(game.energy.dex / powerCost))
+  const trades = Math.floor(game.energy.dex / powerCost)
   if (game.hp <= 0) {
     game.phase = 'defeat'
     game.notice = 'You ran out of HP.'
@@ -148,7 +154,7 @@ export function match(game: Game, column: number) {
   gain(game, card)
   game.streak++
   game.best = Math.max(game.best, game.streak)
-  game.notice = `Matched ${rankText(card.rank)} · +1 ${powers[card.suit].label} energy.`
+  game.notice = 'Matched.'
   const goldEarned = Math.max(0, game.streak - 5)
   if (goldEarned) {
     game.gold += goldEarned
@@ -163,11 +169,11 @@ export function draw(game: Game) {
   const card = game.stock.pop()!
   gain(game, card)
   game.streak = 0
+  const damage = encounters[game.stage].damage
   const blocked = game.dazzled
-  const damage = blocked ? 0 : encounters[game.stage].damage
   game.dazzled = false
-  game.hp = Math.max(0, game.hp - damage)
-  game.notice = `Drew ${rankText(card.rank)} · +1 ${powers[card.suit].label} energy. ${blocked ? 'Dazzle blocked the hit.' : `The guardian hit for ${damage} HP.`}`
+  if (!blocked) game.hp = Math.max(0, game.hp - damage)
+  game.notice = blocked ? 'Dazzle blocked the hit.' : `The guardian hit for ${damage} HP.`
   settle(game)
   return true
 }
@@ -204,10 +210,9 @@ export function cast(game: Game, suit: Suit, column?: number) {
 
 export function equip(game: Game, suit: Suit) {
   if (suit === 'dex' || !canPower(game, 'dex')) return false
-  game.gold--
   game.energy.dex -= powerCost
   game.energy[suit]++
-  game.notice = `Equip spent ${powerCost} Dex and 1 gold to add 1 ${powers[suit].label} energy.`
+  game.notice = `Equip spent ${powerCost} Dex to add 1 ${powers[suit].label} energy.`
   settle(game)
   return true
 }
