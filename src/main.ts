@@ -1,7 +1,7 @@
 ﻿import './style.css'
 import {
   advance, canMatch, canPower, canTarget, cast, columns, draw, encounters, equip, match, maxHp,
-  newGame, powerCost, powers, rankText, suits, wrapRanks,
+  newGame, powers, rankText, suits,
 } from './game.ts'
 import type { Card, Game, Suit, TargetPower } from './game.ts'
 
@@ -30,9 +30,15 @@ let powerInfo: Suit | undefined
 try {
   const raw = localStorage.getItem(saveKey)
   if (raw) {
-    const saved = JSON.parse(raw) as Omit<Game, 'gold' | 'dazzled'> & Partial<Pick<Game, 'gold' | 'dazzled'>>
+    type LegacyFields = 'gold' | 'dazzled' | 'powerCosts'
+    const saved = JSON.parse(raw) as Omit<Game, LegacyFields> & Partial<Pick<Game, LegacyFields>>
     if (saved.tableau?.length === columns && encounters[saved.stage] && saved.active && saved.spent && saved.energy) {
-      game = { ...saved, gold: saved.gold ?? 0, dazzled: saved.dazzled ?? false }
+      game = {
+        ...saved,
+        gold: saved.gold ?? 0,
+        dazzled: saved.dazzled ?? false,
+        powerCosts: saved.powerCosts ?? { str: 2, int: 2, wis: 2, dex: 2, con: 2, chr: 2 },
+      }
       game.notice = game.notice.replace(/^Drew .*? energy\. /, '')
         .replace(/^Matched .*? energy\./, 'Matched.')
         .replace(/^(Equip spent \d+ Dex) and 1 gold/, '$1').trim()
@@ -115,7 +121,7 @@ function health() {
 function powerDescription(suit: Suit) {
   const power = powers[suit]
   return `<strong>${power.name}</strong><p>${power.detail}</p>
-    ${suit === 'dex' ? '' : `<small>Costs ${powerCost} ${power.label} energy.</small>`}`
+    <small>Costs ${game.powerCosts[suit]} ${power.label} energy.</small>`
 }
 
 function powerBar() {
@@ -123,13 +129,14 @@ function powerBar() {
   return `<section class="panel powers ${equipping ? 'equipping' : ''}" aria-label="Powers">
     <div class="power-list">${suits.map(suit => {
       const power = powers[suit]
+      const cost = game.powerCosts[suit]
       const destination = equipping && suit !== 'dex'
       const label = equipping ? destination ? `Give ${power.label} 1 energy` : 'Cancel Equip' :
-        `${power.name}, ${game.energy[suit]} ${power.label} energy`
+        `${power.name}, ${game.energy[suit]} of ${cost} ${power.label} energy`
       return `<div class="power-slot"><button data-action="power-${suit}" class="power ${suit} ${canPower(game, suit) ? 'ready' : ''} ${target === suit ? 'selected' : ''} ${destination ? 'equip-target' : ''}"
         aria-label="${label}" aria-describedby="${equipping ? 'game-notice' : `hint-${suit}`}" aria-expanded="${powerInfo === suit}">
-        <span class="power-icon">${icon(suit)}</span><b>${game.energy[suit]}</b>
-        <span class="power-label">${power.label.toUpperCase()}</span>
+        <span class="power-icon">${icon(suit)}</span><span class="power-label">${power.label.toUpperCase()}</span>
+        <b class="power-energy">${game.energy[suit]}/${cost}</b>
       </button><div class="power-tooltip" role="tooltip" id="hint-${suit}">${powerDescription(suit)}</div></div>`
     }).join('')}</div>
     ${powerInfo ? `<div class="power-popover" role="group" aria-label="${powers[powerInfo].name}">
@@ -208,8 +215,8 @@ document.addEventListener('click', event => {
   const action = button.dataset.action!
   if (action === 'help') {
     modal('How to play', `<ol>
-      <li>Match exposed cards one rank above or below the active card. ${wrapRanks ? 'The loop runs 8, 9, 1/10, 2, 3.' : 'Ranks run from 1 to 9.'} Clear all seven columns to win an encounter.</li>
-      <li>Matching or drawing a card, including the opening card, earns 1 energy of its suit. Each power spends 2 energy of the matching suit. Equip gives another suit 1 energy. Tap that suit’s icon to choose it.</li>
+      <li>Match exposed cards one rank above or below the active card. The loop runs 8, 9, 1/10, 2, 3. Clear all seven columns to win an encounter.</li>
+      <li>Matching or drawing a card, including the opening card, earns 1 energy of its suit. Each power button shows the energy you have and the amount it costs. Equip gives another suit 1 energy. Tap that suit’s icon to choose it.</li>
       <li>Tap a suit to activate its power. Choose an exposed card to remove with Strike. Tactical and Perceive activate immediately. Recover heals 1 HP. Dazzle protects your next draw.</li>
       <li>Every draw breaks your streak and triggers the guardian’s attack. You start the run with 10 HP.</li>
       <li>Each match after the fifth earns gold equal to your current streak minus five.</li>

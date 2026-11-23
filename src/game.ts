@@ -1,13 +1,12 @@
 ﻿export const suits = ['str', 'int', 'wis', 'dex', 'con', 'chr'] as const
 export type Suit = typeof suits[number]
-export const powerCost = 2
 export const maxHp = 10
 export const columns = 7
 export const powers = {
   str: { label: 'Str', name: 'Strike', detail: 'Remove an exposed card from the tableau.' },
   int: { label: 'Int', name: 'Tactical', detail: 'Move the top half of the leftmost longest stack to the first empty column. Round down for odd stacks.' },
   wis: { label: 'Wis', name: 'Perceive', detail: 'Reveal the nearest hidden card in each stack that has one.' },
-  dex: { label: 'Dex', name: 'Equip', detail: 'Spend 2 Dex to give another suit 1 energy.' },
+  dex: { label: 'Dex', name: 'Equip', detail: 'Give another suit 1 energy.' },
   con: { label: 'Con', name: 'Recover', detail: 'Restore 1 HP.' },
   chr: { label: 'Chr', name: 'Dazzle', detail: 'Block the guardian’s damage on your next draw.' },
 } as const
@@ -30,6 +29,7 @@ export type Game = {
   streak: number
   best: number
   energy: Record<Suit, number>
+  powerCosts: Record<Suit, number>
   stock: Card[]
   tableau: Card[][]
   active: Card
@@ -38,15 +38,12 @@ export type Game = {
   notice: string
 }
 
-// Set to true to restore the original rules after testing.
-export const wrapRanks = false
-
-export function nextRank(rank: Rank): Rank | undefined {
-  return rank === 9 ? (wrapRanks ? 1 : undefined) : (rank + 1) as Rank
+export function nextRank(rank: Rank): Rank {
+  return rank === 9 ? 1 : (rank + 1) as Rank
 }
 
 export function rankText(rank: Rank) {
-  return wrapRanks && rank === 1 ? '1/10' : String(rank)
+  return rank === 1 ? '1/10' : String(rank)
 }
 
 function consecutive(a: Rank, b: Rank) {
@@ -92,7 +89,8 @@ function deal(stage: number, random: () => number) {
 }
 
 export function newGame(random = Math.random): Game {
-  return { ...deal(0, random), stage: 0, hp: maxHp, gold: 0, best: 0 }
+  const powerCosts = Object.fromEntries(suits.map(suit => [suit, 1 + Math.floor(random() * 6)])) as Game['powerCosts']
+  return { ...deal(0, random), stage: 0, hp: maxHp, gold: 0, best: 0, powerCosts }
 }
 
 export function top(game: Game, column: number) {
@@ -115,7 +113,7 @@ function nextCoveredCard(stack: Card[]) {
 
 export function canPower(game: Game, suit: Suit) {
   if (game.phase !== 'battle') return false
-  if (game.energy[suit] < powerCost) return false
+  if (game.energy[suit] < game.powerCosts[suit]) return false
   switch (suit) {
     case 'str': return hasStrikeTarget(game)
     case 'int': return hasTacticalMove(game)
@@ -135,15 +133,15 @@ export function canTarget(game: Game, suit: TargetPower, column: number) {
 }
 
 function settle(game: Game) {
-  const trades = Math.floor(game.energy.dex / powerCost)
+  const trades = Math.floor(game.energy.dex / game.powerCosts.dex)
   if (game.hp <= 0) {
     game.phase = 'defeat'
     game.notice = 'You ran out of HP.'
   } else if (game.tableau.every(stack => !stack.length)) {
     game.phase = game.stage === encounters.length - 1 ? 'victory' : 'clear'
     game.notice = 'Every column cleared.'
-  } else if (!game.stock.length && !(hasStrikeTarget(game) && game.energy.str + trades >= powerCost) &&
-    !(hasTacticalMove(game) && game.energy.int + trades >= powerCost) &&
+  } else if (!game.stock.length && !(hasStrikeTarget(game) && game.energy.str + trades >= game.powerCosts.str) &&
+    !(hasTacticalMove(game) && game.energy.int + trades >= game.powerCosts.int) &&
     !game.tableau.some(stack => stack.length && canMatch(game, stack[stack.length - 1]))) {
     game.phase = 'defeat'
     game.notice = 'No stock or playable cards remain.'
@@ -212,16 +210,17 @@ export function cast(game: Game, suit: Suit, column?: number) {
     }
     game.notice = 'Perceive revealed the next hidden card in each stack.'
   }
-  game.energy[suit] -= powerCost
+  game.energy[suit] -= game.powerCosts[suit]
   settle(game)
   return true
 }
 
 export function equip(game: Game, suit: Suit) {
   if (suit === 'dex' || !canPower(game, 'dex')) return false
-  game.energy.dex -= powerCost
+  const cost = game.powerCosts.dex
+  game.energy.dex -= cost
   game.energy[suit]++
-  game.notice = `Equip spent ${powerCost} Dex to add 1 ${powers[suit].label} energy.`
+  game.notice = `Equip spent ${cost} Dex to add 1 ${powers[suit].label} energy.`
   settle(game)
   return true
 }

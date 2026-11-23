@@ -20,8 +20,8 @@ Click an exposed matching card. Click the stock or press **D** to draw when need
 | Str | Strike | Remove the selected exposed card from the tableau, leaving the active card and discard pile alone. |
 | Int | Tactical | Move the top half of the leftmost longest stack into the first empty column, rounding down for odd stacks. |
 | Wis | Perceive | Show the rank and suit of the nearest hidden card in every stack that has one, skipping cards already revealed. |
-| Dex | Equip | Spend 2 Dex energy to give another suit 1 energy. Choose the suit by tapping its icon. |
+| Dex | Equip | Spend Dex energy to give another suit 1 energy. Choose the suit by tapping its icon. |
 | Con | Recover | Restore 1 HP, up to 10. |
 | Chr | Dazzle | Block the guardian's damage on the next draw. |
 
-Powers cost two energy of their own suit and leave the active card in place. Clearing an encounter restores up to 3 HP and advances to a newly shuffled deck.
+Each power rolls a cost of 1 to 6 energy of its own suit at the start of a run and keeps that cost for the whole run. Powers leave the active card in place. Clearing an encounter restores up to 3 HP and advances to a newly shuffled deck.
