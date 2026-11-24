@@ -11,7 +11,7 @@ const suitArt: Record<Suit, string> = {
   wis: '....####.... / ..##....##.. / .#...##...#. / #...####...# / #...####...# / .#...##...#. / ..##....##.. / ....####....',
   dex: '......###... / .....###.... / ....###..... / ...###...... / ..########.. / .....####... / ....###..... / ...###...... / ..##........ / .#..........',
   con: '..###..###.. / .#####.####. / ###########. / ###########. / .#########.. / ..#######... / ...#####.... / ....###..... / .....#......',
-  chr: '.....##..... / .....##..... / ....####.... / .##########. / ..########.. / ...######... / ...######... / ..###..###.. / ..##....##..',
+  cha: '.....##..... / .....##..... / ....####.... / .##########. / ..########.. / ...######... / ...######... / ..###..###.. / ..##....##..',
 }
 function icon(suit: Suit) {
   const path = suitArt[suit].split(' / ').map((row, y, rows) =>
@@ -19,6 +19,29 @@ function icon(suit: Suit) {
   ).join('')
   return `<svg viewBox="0 0 12 12" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="${path}"/></svg>`
 }
+
+const powerArt: Record<Suit, string> = {
+  str: '.......dd / ......dwsd / ......dwsd / .....dwwssd / .....dwwssd / ....dswwsssd / ....dswwsssd / ....dswwsssd / ....dswwsssd / .....dwwssd / ...dddddddddd / ...dgygggybd / ....dddddddd / ......dbbd / ......dggd / .......dd',
+  int: '..dd...dd...dd / .dssd.dggd.dssd / dwwssddggddsswwd / dwssssdggdsssswd / dwsssggggggssswd / dwsssgyyyygssswd / dssssggggggssssd / dsssssdgbdsssssd / .dssdddgbddssd / ..dd..dggd..dd / ......dgbd / ......dggd / ......dgbd / ......dggd / ......dbbd / .......dd',
+  wis: '................ / ...dddd..dddd / ..dpssd..dpssd / ..dpssddddpssd / .dppsspuuppsspd / .dppssddddpsspd / .dpsssddddpsssd / .dddddddddddddd / dppppppddppppppd / dpwcccpddpwcccpd / dpwucupddpwucupd / dpccuupddpccuupd / dpcuuupddpcuuupd / .dppppd..dppppd / ..dddd....dddd',
+  dex: '......dddd / .....dbbbbd / .....db..bd / ....dddddddd / ...dwggggggbd / ..dwggggggggbd / ..dgddddddddbd / .dbdgbggggbgdbd / .dbdgdggggdgdbd / .dbdgdggggdgdbd / .dbdgdbbbbdgdbd / .dbdgbybbybgdbd / .dbdgbybbybgdbd / ..dgbbbbbbbbdd / ...dddddddddd',
+  con: '..rrr......rrr / .rhhhr....rlllr / rhhhllr..rlllllr / rhwwhllrrllllllr / rhlwhllllllllllr / rlllllllwwlllllr / .rllllllwwllllr / .rllllwwwwwwllr / ..rlllwwwwwwlr / ...rllllwwllr / ....rlllwwlr / .....rllllr / ......rllr / .......rr',
+  cha: '.......w / .......w.....g / ..g....y....ggg / .gyg...y.....g / ..g...gyg / .....gywyg / ....gywwwyg / wyyyywwwwwyyyyw / ....gywwwyg / .....gywyg / .g....gyg....g / gyg....y....gyg / .g.....y.....g / .......w / .......w',
+}
+const powerPalette: Record<string, string> = {
+  s: '#8398b5', w: '#fff5dc', g: '#ecad44', b: '#935132', p: '#ad74ed',
+  c: '#5ad9dd', d: '#262143', r: '#9b203e', h: '#ff9c9d', l: '#ef5067', y: '#ffd45a', u: '#2b9aaa',
+}
+
+const powerIcons = Object.fromEntries(suits.map(suit => {
+  const rows = powerArt[suit].split(' / ')
+  const paths = Object.entries(powerPalette).map(([cell, color]) => {
+    const path = rows.map((row, y) => Array.from(row, (pixel, x) =>
+      pixel === cell ? `M${x} ${y}h1v1h-1z` : '').join('')).join('')
+    return path ? `<path fill="${color}" d="${path}"/>` : ''
+  }).join('')
+  return [suit, `<svg class="power-title-icon" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">${paths}</svg>`]
+}))
 
 const app = document.querySelector<HTMLDivElement>('#app')!
 const dialogs = document.querySelector<HTMLDivElement>('#dialogs')!
@@ -31,17 +54,27 @@ try {
   const raw = localStorage.getItem(saveKey)
   if (raw) {
     type LegacyFields = 'gold' | 'dazzled' | 'powerCosts'
-    const saved = JSON.parse(raw) as Omit<Game, LegacyFields> & Partial<Pick<Game, LegacyFields>>
+    const saved = JSON.parse(raw, (key, value) => {
+      if (key === 'suit' && value === 'chr') return 'cha'
+      if (key === 'id' && typeof value === 'string' && value.startsWith('chr-')) return `cha-${value.slice(4)}`
+      if ((key === 'energy' || key === 'powerCosts') && value?.chr !== undefined) {
+        const { chr, ...counts } = value
+        return { ...counts, cha: counts.cha ?? chr }
+      }
+      return value
+    }) as Omit<Game, LegacyFields> & Partial<Pick<Game, LegacyFields>>
     if (saved.tableau?.length === columns && encounters[saved.stage] && saved.active && saved.spent && saved.energy) {
       game = {
         ...saved,
         gold: saved.gold ?? 0,
         dazzled: saved.dazzled ?? false,
-        powerCosts: saved.powerCosts ?? { str: 2, int: 2, wis: 2, dex: 2, con: 2, chr: 2 },
+        powerCosts: saved.powerCosts ?? { str: 2, int: 2, wis: 2, dex: 2, con: 2, cha: 2 },
       }
       game.notice = game.notice.replace(/^Drew .*? energy\. /, '')
         .replace(/^Matched .*? energy\./, 'Matched.')
-        .replace(/^(Equip spent \d+ Dex) and 1 gold/, '$1').trim()
+        .replace(/^(Equip spent \d+ Dex) and 1 gold/, '$1')
+        .replace(/^Tactical moved /, 'Cleave moved ')
+        .replace(/\bChr\b/g, 'Cha').trim()
     }
   }
 } catch { /* A fresh run remains available without storage. */ }
@@ -133,11 +166,13 @@ function powerBar() {
       const destination = equipping && suit !== 'dex'
       const label = equipping ? destination ? `Give ${power.label} 1 energy` : 'Cancel Equip' :
         `${power.name}, ${game.energy[suit]} of ${cost} ${power.label} energy`
-      return `<div class="power-slot"><button data-action="power-${suit}" class="power ${suit} ${canPower(game, suit) ? 'ready' : ''} ${target === suit ? 'selected' : ''} ${destination ? 'equip-target' : ''}"
-        aria-label="${label}" aria-describedby="${equipping ? 'game-notice' : `hint-${suit}`}" aria-expanded="${powerInfo === suit}">
+      const state = `${suit} ${canPower(game, suit) ? 'ready' : ''} ${target === suit ? 'selected' : ''} ${destination ? 'equip-target' : ''}`
+      const attributes = `data-action="power-${suit}" aria-label="${label}" aria-describedby="${equipping ? 'game-notice' : `hint-${suit}`}" aria-expanded="${powerInfo === suit}"`
+      return `<div class="power-slot"><button class="power ${state}" ${attributes}>
         <span class="power-icon">${icon(suit)}</span><span class="power-label">${power.label.toUpperCase()}</span>
         <b class="power-energy">${game.energy[suit]}/${cost}</b>
-      </button><div class="power-tooltip" role="tooltip" id="hint-${suit}">${powerDescription(suit)}</div></div>`
+      </button><div class="power-tooltip" role="tooltip" id="hint-${suit}">${powerDescription(suit)}</div>
+        <button class="power-title ${state}" ${attributes}>${powerIcons[suit]}<span>${power.name}</span></button></div>`
     }).join('')}</div>
     ${powerInfo ? `<div class="power-popover" role="group" aria-label="${powers[powerInfo].name}">
       ${powerDescription(powerInfo)}
@@ -217,7 +252,7 @@ document.addEventListener('click', event => {
     modal('How to play', `<ol>
       <li>Match exposed cards one rank above or below the active card. The loop runs 8, 9, 1/10, 2, 3. Clear all seven columns to win an encounter.</li>
       <li>Matching or drawing a card, including the opening card, earns 1 energy of its suit. Each power button shows the energy you have and the amount it costs. Equip gives another suit 1 energy. Tap that suit’s icon to choose it.</li>
-      <li>Tap a suit to activate its power. Choose an exposed card to remove with Strike. Tactical and Perceive activate immediately. Recover heals 1 HP. Dazzle protects your next draw.</li>
+      <li>Tap a suit to activate its power. Choose an exposed card to remove with Strike. Cleave and Perceive activate immediately. Recover heals 1 HP. Dazzle protects your next draw.</li>
       <li>Every draw breaks your streak and triggers the guardian’s attack. You start the run with 10 HP.</li>
       <li>Each match after the fifth earns gold equal to your current streak minus five.</li>
     </ol><button class="primary" data-action="close">Back to game</button>`)
