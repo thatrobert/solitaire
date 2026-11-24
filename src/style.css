@@ -172,7 +172,9 @@ main { display: grid; gap: 9px; }
 .dex { --suit-ink: #845719; --accent: #ffe18b; --chip: #584125; }
 .con { --suit-ink: #276751; --accent: #9ae1b2; --chip: #244b43; }
 .cha { --suit-ink: #94396e; --accent: #ffacd8; --chip: #59314e; }
+.joker { --suit-ink: #523476; --accent: #e8d2ff; --chip: #48345d; }
 .face {
+  padding-bottom: 8px;
   color: var(--suit-ink);
   background: #f5dbad;
   border-color: #b4946e;
@@ -182,6 +184,14 @@ main { display: grid; gap: 9px; }
 .card-symbol { display: block; width: 34%; margin-top: 3%; }
 svg { display: block; width: 100%; height: auto; }
 .card-suit { font: .64rem/1 var(--text); text-transform: uppercase; }
+.face.joker {
+  padding: 2px;
+}
+.joker .card-symbol { width: 58%; margin-top: 0; }
+.card-modifier { position: absolute; inset: auto 0 2px; width: clamp(8px, 22%, 14px); margin-inline: auto; }
+.card-modifier.shield { color: #35516d; }
+.card-modifier.drop { color: #a61120; }
+.card-modifier.bomb { color: #382b43; }
 .match { border-color: #ffdd87; box-shadow: inset 0 0 0 2px #ffe8bd, 0 0 0 1px #ffdd87, 0 0 9px #ffca6577; }
 .target { border-color: #d3b1ff; box-shadow: inset 0 0 0 2px #ffe8bd, 0 0 0 1px #d3b1ff, 0 0 9px #c99bff99; }
 .muted-card { filter: brightness(.76) saturate(.8); }
@@ -256,42 +266,31 @@ svg { display: block; width: 100%; height: auto; }
 .power-list { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
 .power {
   display: grid;
-  grid-template-columns: auto auto;
+  grid-template-columns: minmax(0, 1fr);
   align-content: center;
-  align-items: center;
-  justify-content: center;
-  gap: 1px clamp(2px, .7vw, 7px);
-  min-height: 44px;
+  justify-items: center;
+  gap: 3px;
   width: 100%;
-  padding: 3px;
+  height: 100%;
+  padding: 5px 3px;
   border: 2px solid #585478;
   color: var(--accent);
   background: var(--chip);
   box-shadow: inset 0 -3px #12132383;
-  font: 400 1.15rem/1 var(--text);
-}
-.power:not(.ready):not(.selected) { filter: saturate(.65); }
-:is(.power, .power-title):is(.ready, .selected, [aria-expanded="true"]) { border-color: var(--accent); }
-:is(.power, .power-title).equip-target { border-style: dashed; border-color: var(--gold); filter: none; }
-:is(.power, .power-title):is(:hover, [aria-expanded="true"]) { filter: brightness(1.18); }
-.power-icon { display: grid; place-items: center; flex-shrink: 0; width: clamp(14px, 4.2vw, 24px); color: var(--accent); }
-.power-label { font-size: .72rem; }
-.power-energy { grid-column: 1 / -1; text-align: center; font-size: .9rem; }
-.power-title {
-  display: grid;
-  justify-items: center;
-  gap: 3px;
-  width: 100%;
-  margin-top: 3px;
-  padding: 2px 0;
-  border: 1px solid #585478;
-  background: var(--chip);
-  color: var(--accent);
-  text-align: center;
-  font-size: clamp(.65rem, 2.4vw, .85rem);
   line-height: 1.15;
 }
-.power-title-icon { width: min(100%, clamp(36px, 9vw, 54px)); }
+.power:is(.ready, .selected, [aria-expanded="true"]) { border-color: var(--accent); }
+.power.equip-target { border-style: dashed; border-color: var(--gold); }
+.power:is(:hover, [aria-expanded="true"]) { filter: brightness(1.18); }
+.power-label { font-size: .72rem; }
+.power-energy { font-size: 1.8rem; line-height: 1; white-space: nowrap; }
+.power-name { font-size: clamp(.65rem, 2.4vw, .85rem); }
+.power-title-icon {
+  display: block;
+  width: min(100%, clamp(36px, 9vw, 54px));
+  height: auto;
+  image-rendering: pixelated;
+}
 .power-tooltip, .power-popover {
   position: absolute;
   z-index: 3;
@@ -307,7 +306,7 @@ svg { display: block; width: 100%; height: auto; }
 .power-tooltip strong, .power-popover strong { font: 400 .62rem/1.6 var(--pixel); color: var(--gold); }
 .power-tooltip p, .power-popover p { color: #e7dff4; }
 .power-tooltip small, .power-popover small { color: var(--muted); }
-.powers:not(.equipping):not(:has(.power-popover)) .power-slot:has(button:focus-visible) .power-tooltip { display: block; }
+.powers:not(.equipping):not(:has(.power-popover)) .power:focus-visible + .power-tooltip { display: block; }
 @media (hover: hover) {
   .powers:not(.equipping):not(:has(.power-popover)) .power-slot:hover .power-tooltip { display: block; }
 }
@@ -338,4 +337,7 @@ dialog .primary:hover { background: #ffda87; }
   .board { --layer-gap: 18px; padding-inline: 6px; }
   .encounter { padding: 4px 8px; align-items: start; flex-direction: column; }
   .power { padding-inline: 1px; }
+}
+@media (max-width: 372px) {
+  .power-energy.long-count { transform: scaleX(.75); }
 }

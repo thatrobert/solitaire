@@ -1,51 +1,60 @@
 ﻿import './style.css'
 import {
-  advance, canMatch, canPower, canTarget, cast, columns, draw, encounters, equip, match, maxHp,
-  newGame, powers, rankText, suits,
+  advance, canMatch, canPower, canTarget, cast, columns, draw, drawPile, encounters, equip, match, maxHp,
+  newGame, powers, rankText, stayInEncounter, suits,
 } from './game.ts'
-import type { Card, Game, Suit, TargetPower } from './game.ts'
+import type { Card, CardModifier, Game, Joker, Suit, TargetPower } from './game.ts'
 
-const suitArt: Record<Suit, string> = {
-  str: '...##.##.... / ..########.. / ..##.#.#.##. / .#.#.#.#.##. / #..########. / #.##......#. / ##..####..#. / .###......#. / ..##.....##. / ...#######.. / ...#.....#.. / ...#######..',
-  int: '............ / ..###.###... / .####.####.. / ##.##.#.###. / #.###.##.##. / #####.#####. / ##.##.##.### / .#.##.##..## / .####.#####. / ..####.###.. / ....##.#.... / ............',
-  wis: '....####.... / ..##....##.. / .#...##...#. / #...####...# / #...####...# / .#...##...#. / ..##....##.. / ....####....',
-  dex: '......###... / .....###.... / ....###..... / ...###...... / ..########.. / .....####... / ....###..... / ...###...... / ..##........ / .#..........',
-  con: '..###..###.. / .#####.####. / ###########. / ###########. / .#########.. / ..#######... / ...#####.... / ....###..... / .....#......',
-  cha: '.....##..... / .....##..... / ....####.... / .##########. / ..########.. / ...######... / ...######... / ..###..###.. / ..##....##..',
-}
-function icon(suit: Suit) {
-  const path = suitArt[suit].split(' / ').map((row, y, rows) =>
-    Array.from(row, (cell, x) => cell === '#' ? `M${x} ${y + Math.floor((12 - rows.length) / 2)}h1v1h-1z` : '').join('')
-  ).join('')
-  return `<svg viewBox="0 0 12 12" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="${path}"/></svg>`
-}
-
-const powerArt: Record<Suit, string> = {
-  str: '.......dd / ......dwsd / ......dwsd / .....dwwssd / .....dwwssd / ....dswwsssd / ....dswwsssd / ....dswwsssd / ....dswwsssd / .....dwwssd / ...dddddddddd / ...dgygggybd / ....dddddddd / ......dbbd / ......dggd / .......dd',
-  int: '..dd...dd...dd / .dssd.dggd.dssd / dwwssddggddsswwd / dwssssdggdsssswd / dwsssggggggssswd / dwsssgyyyygssswd / dssssggggggssssd / dsssssdgbdsssssd / .dssdddgbddssd / ..dd..dggd..dd / ......dgbd / ......dggd / ......dgbd / ......dggd / ......dbbd / .......dd',
-  wis: '................ / ...dddd..dddd / ..dpssd..dpssd / ..dpssddddpssd / .dppsspuuppsspd / .dppssddddpsspd / .dpsssddddpsssd / .dddddddddddddd / dppppppddppppppd / dpwcccpddpwcccpd / dpwucupddpwucupd / dpccuupddpccuupd / dpcuuupddpcuuupd / .dppppd..dppppd / ..dddd....dddd',
-  dex: '......dddd / .....dbbbbd / .....db..bd / ....dddddddd / ...dwggggggbd / ..dwggggggggbd / ..dgddddddddbd / .dbdgbggggbgdbd / .dbdgdggggdgdbd / .dbdgdggggdgdbd / .dbdgdbbbbdgdbd / .dbdgbybbybgdbd / .dbdgbybbybgdbd / ..dgbbbbbbbbdd / ...dddddddddd',
-  con: '..rrr......rrr / .rhhhr....rlllr / rhhhllr..rlllllr / rhwwhllrrllllllr / rhlwhllllllllllr / rlllllllwwlllllr / .rllllllwwllllr / .rllllwwwwwwllr / ..rlllwwwwwwlr / ...rllllwwllr / ....rlllwwlr / .....rllllr / ......rllr / .......rr',
-  cha: '.......w / .......w.....g / ..g....y....ggg / .gyg...y.....g / ..g...gyg / .....gywyg / ....gywwwyg / wyyyywwwwwyyyyw / ....gywwwyg / .....gywyg / .g....gyg....g / gyg....y....gyg / .g.....y.....g / .......w / .......w',
-}
-const powerPalette: Record<string, string> = {
-  s: '#8398b5', w: '#fff5dc', g: '#ecad44', b: '#935132', p: '#ad74ed',
-  c: '#5ad9dd', d: '#262143', r: '#9b203e', h: '#ff9c9d', l: '#ef5067', y: '#ffd45a', u: '#2b9aaa',
+const suitPaths: Record<Suit, string> = {
+  str: `M17 22v-5c1.4-1.2 3.7-3 4-4.9.3-1.6-.7-2.9-2.3-3.3V6.7
+    C18.7 4.8 16.3 4.2 15.2 5.7 15.2 2.5 12 2.2 10.9 5.1 10.7 2.2 7.4 2.3 6.6 5.3
+    5.6 3.8 2.8 4.4 2.8 7.1v5.5c0 2.6.9 4.5 2.5 6.2V22z
+    M15.2 5.7v1M10.9 5.1v2M6.6 5.3v1.6`,
+  int: `M12 5.5C10 2 5.6 2.5 5 5.6 2.6 6.2 1.4 8.6 2.5 10.9
+    .5 12.6 1.2 16 3.5 17.2 3.3 20.4 7.3 22.1 9 19.6 10.5 20 12 18.9 12 17.1
+    12 18.9 13.5 20 15 19.6 16.7 22.1 20.7 20.4 20.5 17.2
+    22.8 16 23.5 12.6 21.5 10.9 22.6 8.6 21.4 6.2 19 5.6 18.4 2.5 14 2 12 5.5Z
+    M12 5.5v11.6M5.8 9.4c2 0 3.3 1.4 3.3 3.3m-5.6 4.5c.5-1.3 1.5-2.1 2.8-2.2
+    M18.2 9.4c-2 0-3.3 1.4-3.3 3.3m5.6 4.5c-.5-1.3-1.5-2.1-2.8-2.2`,
+  wis: `M1 12c2.5-4.4 6.6-7.1 11-7.1s8.5 2.7 11 7.1c-2.5 4.4-6.6 7.1-11 7.1S3.5 16.4 1 12z
+    M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 1 0 0-7z`,
+  dex: 'M13.6 1 3 14h8.3l-1 9L21 10h-8.4z',
+  con: 'M12 21.5 3.8 13.6C-2.2 7.8 5.7.1 12 6.1c6.3-6 14.2 1.7 8.2 7.5z',
+  cha: 'M12 1.3 15.2 8l7.4 1-5.4 5.2 1.3 7.4-6.5-3.5-6.5 3.5 1.3-7.4L1.4 9l7.4-1z',
 }
 
-const powerIcons = Object.fromEntries(suits.map(suit => {
-  const rows = powerArt[suit].split(' / ')
-  const paths = Object.entries(powerPalette).map(([cell, color]) => {
-    const path = rows.map((row, y) => Array.from(row, (pixel, x) =>
-      pixel === cell ? `M${x} ${y}h1v1h-1z` : '').join('')).join('')
-    return path ? `<path fill="${color}" d="${path}"/>` : ''
-  }).join('')
-  return [suit, `<svg class="power-title-icon" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">${paths}</svg>`]
-}))
+const jokerArt: Record<Joker, { label: string; path: string }> = {
+  fool: {
+    label: 'Fool',
+    path: `M5.5 16c.7-3.1-.2-5.6-2.1-7.7 3.2-.8 5.9.4 8.1 3.1-.5-3.4.6-5.7 3.1-7.2
+      -.1 2.8.7 4.8 2.4 6.7 1.3-1.5 2.4-2.3 4-2.3-1.8 2.1-2.5 4.6-2.5 7.4
+      M5.5 16h13v3.5c-3.8 1.3-9.2 1.3-13 0z
+      M3 7a1.1 1.1 0 1 0 0 2.2A1.1 1.1 0 1 0 3 7z
+      M14.8 2.3a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 1 0 0-2.2z
+      M21.3 7.3a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 1 0 0-2.2z`,
+  },
+  door: {
+    label: 'Door',
+    path: 'M3 22V10a9 9 0 0 1 18 0v12zM6.5 22V10a5.5 5.5 0 0 1 11 0v12M12 4.5V22m3-8h.2',
+  },
+}
+
+function cardIcon(card: Card) {
+  const path = card.joker ? jokerArt[card.joker].path : suitPaths[card.suit]
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${path}"/></svg>`
+}
+
+const modifierIcons: Record<CardModifier, { label: string; path: string }> = {
+  shield: { label: 'Shield', path: 'M12 2 3 5v6c0 5.5 3.5 9.1 9 11 5.5-1.9 9-5.5 9-11V5z' },
+  drop: { label: 'Blood drop', path: 'M12 1C10 5.7 4.5 11.3 4.5 15.5a7.5 7.5 0 0 0 15 0C19.5 11.3 14 5.7 12 1z' },
+  bomb: { label: 'Bomb', path: 'M12 7V5h3.2c.5-2.5 2.6-4 5.3-4v2c-1.6 0-2.6.7-3 2H19v3.6c1.9 1.5 3 3.8 3 6.4a8.5 8 0 1 1-10-8z' },
+}
 
 const app = document.querySelector<HTMLDivElement>('#app')!
 const dialogs = document.querySelector<HTMLDivElement>('#dialogs')!
 const saveKey = 'gate-nine-v1'
+const legacyEncounterArts = ['sentinel', 'keeper', 'regent', 'wyrm']
 let game = newGame()
 let target: TargetPower | 'dex' | undefined
 let powerInfo: Suit | undefined
@@ -53,8 +62,8 @@ let powerInfo: Suit | undefined
 try {
   const raw = localStorage.getItem(saveKey)
   if (raw) {
-    type LegacyFields = 'gold' | 'dazzled' | 'powerCosts'
-    const saved = JSON.parse(raw, (key, value) => {
+    type LegacyFields = 'gold' | 'dazzled' | 'powerCosts' | 'scenarioDeck'
+    const { encounterArt, ...saved } = JSON.parse(raw, (key, value) => {
       if (key === 'suit' && value === 'chr') return 'cha'
       if (key === 'id' && typeof value === 'string' && value.startsWith('chr-')) return `cha-${value.slice(4)}`
       if ((key === 'energy' || key === 'powerCosts') && value?.chr !== undefined) {
@@ -62,13 +71,22 @@ try {
         return { ...counts, cha: counts.cha ?? chr }
       }
       return value
-    }) as Omit<Game, LegacyFields> & Partial<Pick<Game, LegacyFields>>
-    if (saved.tableau?.length === columns && encounters[saved.stage] && saved.active && saved.spent && saved.energy) {
+    }) as Omit<Game, LegacyFields> & Partial<Pick<Game, LegacyFields>> & { encounterArt?: string }
+    const savedArt = encounterArt ?? legacyEncounterArts[saved.stage]
+    const stage = encounters.findIndex(encounter => encounter.art === savedArt)
+    if (saved.tableau?.length === columns && stage >= 0 && saved.active && saved.spent && saved.energy) {
       game = {
         ...saved,
+        stage,
+        scenarioDeck: saved.scenarioDeck ?? saved.stock.map(card => ({ ...card, id: `scenario-${card.id}` })),
         gold: saved.gold ?? 0,
         dazzled: saved.dazzled ?? false,
         powerCosts: saved.powerCosts ?? { str: 2, int: 2, wis: 2, dex: 2, con: 2, cha: 2 },
+      }
+      if (encounters[stage].layout === 'ruins') {
+        for (const card of game.tableau.flat()) {
+          if (card.modifier === 'drop') card.modifier = 'bomb'
+        }
       }
       game.notice = game.notice.replace(/^Drew .*? energy\. /, '')
         .replace(/^Matched .*? energy\./, 'Matched.')
@@ -80,26 +98,35 @@ try {
 } catch { /* A fresh run remains available without storage. */ }
 
 function save() {
-  try { localStorage.setItem(saveKey, JSON.stringify(game)) } catch { /* Storage is optional. */ }
+  try {
+    localStorage.setItem(saveKey, JSON.stringify({ ...game, encounterArt: encounters[game.stage].art }))
+  } catch { /* Storage is optional. */ }
 }
 
 function cardLabel(card: Card) {
-  return `${rankText(card.rank)} · ${powers[card.suit].label}`
+  return card.joker ? `The ${jokerArt[card.joker].label}` : `${rankText(card.rank)} · ${powers[card.suit].label}`
 }
 
 function face(card: Card) {
+  if (card.joker) return `<span class="card-symbol">${cardIcon(card)}</span>`
+  const modifier = card.modifier
   return `<span class="card-index">${rankText(card.rank)}</span>
-    <span class="card-symbol">${icon(card.suit)}</span>
-    <span class="card-suit">${powers[card.suit].label}</span>`
+    <span class="card-symbol">${cardIcon(card)}</span>
+    <span class="card-suit">${powers[card.suit].label}</span>
+    ${modifier ? `<svg class="card-modifier ${modifier}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="${modifierIcons[modifier].path}"/></svg>` : ''}`
 }
 
 function hero() {
   const room = encounters[game.stage]
   const image = `${import.meta.env.BASE_URL}${room.art}-pixel.png`
+  const addsCard = room.layout === 'ruins'
+  const protectedDraw = room.damage > 0 && game.dazzled
+  const drawNote = addsCard ? '+1 card per draw' : protectedDraw ? 'Next draw damage blocked' : `-${room.damage} HP per draw`
   return `<section class="encounter" style="--scene:url('${image}')" aria-label="Current encounter">
-    <h2>${game.stage + 1}. ${room.name}</h2>
-    ${game.phase === 'battle' ? `<div class="intent ${game.dazzled ? 'protected' : ''}">
-      <strong>${game.dazzled ? 'Next draw protected' : `-${room.damage} HP per draw`}</strong></div>` : ''}
+    <h2>${room.name}</h2>
+    ${game.phase === 'battle' && (addsCard || room.damage > 0) ? `<div class="intent ${protectedDraw ? 'protected' : ''}">
+      <strong>${drawNote}</strong></div>` : ''}
   </section>`
 }
 
@@ -110,25 +137,29 @@ function stack(cards: Card[], index: number) {
   const eligible = target === 'dex' ? false : target ? canTarget(game, target, index) : matching
   const revealed = coveredCards.filter(card => card.revealed).reverse().map(cardLabel)
   const revealedLabel = revealed.length ? ` Behind: ${revealed.join(', ')}.` : ''
+  const modifierLabel = card?.modifier ? ` ${modifierIcons[card.modifier].label}.` : ''
   return `<div class="stack" style="--depth:${Math.max(0, cards.length - 1)}">
     ${coveredCards.map((covered, depth) =>
-      `<div class="card back behind ${covered.revealed ? covered.suit + ' revealed' : ''}" style="--level:${depth}" aria-hidden="true">
-        ${covered.revealed ? `<span class="peek">${rankText(covered.rank)}${icon(covered.suit)}</span>` : ''}</div>`).join('')}
-    ${card ? `<button class="card face ${card.suit} ${eligible ? target ? 'target' : 'match' : 'muted-card'}"
+      `<div class="card back behind ${covered.revealed ? `${covered.joker ? 'joker' : covered.suit} revealed` : ''}" style="--level:${depth}" aria-hidden="true">
+        ${covered.revealed ? `<span class="peek">${covered.joker ? '' : rankText(covered.rank)}${cardIcon(covered)}</span>` : ''}</div>`).join('')}
+    ${card ? `<button class="card face ${card.joker ? 'joker' : card.suit} ${eligible ? target ? 'target' : 'match' : 'muted-card'}"
       data-action="card-${index}" ${eligible ? '' : 'disabled'}
-      aria-label="${target && eligible ? powers[target].name + ': ' : ''}${cardLabel(card)}. Column ${index + 1}, ${coveredCards.length} covered.${revealedLabel}">
+      aria-label="${target && eligible ? powers[target].name + ': ' : ''}${cardLabel(card)}.${modifierLabel} Column ${index + 1}, ${coveredCards.length} covered.${revealedLabel}">
       ${face(card)}</button>` : `<div class="card vacant" aria-label="Empty column ${index + 1}">◇</div>`}
   </div>`
 }
 
 function board() {
+  const room = encounters[game.stage]
+  const drawLabel = room.layout === 'ruins' ? 'Draw from the player deck' : 'Draw from the guardian deck'
+  const cardsLeft = drawPile(game).length
   return `<section class="panel board" aria-label="Card table">
-    <div class="tableau" style="--layers:${encounters[game.stage].rows - 1}">${game.tableau.map(stack).join('')}</div>
+    <div class="tableau" style="--layers:${room.rows - 1}">${game.tableau.map(stack).join('')}</div>
     <div class="play-area">
       ${health()}
-      <div class="card face active ${game.active.suit}" role="img" aria-label="Active card: ${cardLabel(game.active)}">${face(game.active)}</div>
-      <button class="card back stock" data-action="draw" aria-label="Draw, ${game.stock.length} cards left"
-        ${game.phase === 'battle' && game.stock.length ? '' : 'disabled'}><span aria-hidden="true">✺</span><b>${game.stock.length}</b></button>
+      <div class="card face active ${game.active.joker ? 'joker' : game.active.suit}" role="img" aria-label="Active card: ${cardLabel(game.active)}">${face(game.active)}</div>
+      <button class="card back stock" data-action="draw" aria-label="${drawLabel}, ${cardsLeft} cards left"
+        ${game.phase === 'battle' && cardsLeft ? '' : 'disabled'}><span aria-hidden="true">✺</span><b>${cardsLeft}</b></button>
       <div class="gold-coin" role="img" aria-label="${game.gold} gold">${game.gold}</div>
       <div class="streak">STREAK <b>${game.streak}/${game.best}</b></div>
     </div>
@@ -163,16 +194,21 @@ function powerBar() {
     <div class="power-list">${suits.map(suit => {
       const power = powers[suit]
       const cost = game.powerCosts[suit]
+      const energy = game.energy[suit]
       const destination = equipping && suit !== 'dex'
       const label = equipping ? destination ? `Give ${power.label} 1 energy` : 'Cancel Equip' :
-        `${power.name}, ${game.energy[suit]} of ${cost} ${power.label} energy`
+        `${power.name}, ${energy} of ${cost} ${power.label} energy`
       const state = `${suit} ${canPower(game, suit) ? 'ready' : ''} ${target === suit ? 'selected' : ''} ${destination ? 'equip-target' : ''}`
-      const attributes = `data-action="power-${suit}" aria-label="${label}" aria-describedby="${equipping ? 'game-notice' : `hint-${suit}`}" aria-expanded="${powerInfo === suit}"`
-      return `<div class="power-slot"><button class="power ${state}" ${attributes}>
-        <span class="power-icon">${icon(suit)}</span><span class="power-label">${power.label.toUpperCase()}</span>
-        <b class="power-energy">${game.energy[suit]}/${cost}</b>
-      </button><div class="power-tooltip" role="tooltip" id="hint-${suit}">${powerDescription(suit)}</div>
-        <button class="power-title ${state}" ${attributes}>${powerIcons[suit]}<span>${power.name}</span></button></div>`
+      return `<div class="power-slot">
+        <button type="button" class="power ${state}" data-action="power-${suit}" aria-label="${label}"
+          aria-describedby="${equipping ? 'game-notice' : `hint-${suit}`}" aria-expanded="${powerInfo === suit}">
+          <span class="power-label">${power.label.toUpperCase()}</span>
+          <b class="power-energy${energy >= 10 ? ' long-count' : ''}">${energy}/${cost}</b>
+          <img class="power-title-icon" src="${import.meta.env.BASE_URL}power-icons/power-${suit}.png" width="18" height="18" alt="">
+          <span class="power-name">${power.name}</span>
+        </button>
+        <div class="power-tooltip" role="tooltip" id="hint-${suit}">${powerDescription(suit)}</div>
+      </div>`
     }).join('')}</div>
     ${powerInfo ? `<div class="power-popover" role="group" aria-label="${powers[powerInfo].name}">
       ${powerDescription(powerInfo)}
@@ -209,12 +245,18 @@ function modal(title: string, html: string, locked = false) {
 }
 
 function showPhase() {
+  if (game.phase === 'door') {
+    modal('The Door', `<p>You found a hidden door!</p>
+      <div class="dialog-actions"><button data-action="stay" autofocus>Stay</button>
+      <button class="primary" data-action="advance">Go through it</button></div>`, true)
+  }
   if (game.phase === 'clear') {
-    modal('Guardian defeated', `<p>Every column cleared. Recover up to 3 HP and face ${encounters[game.stage + 1].name}.</p>
+    const title = encounters[game.stage].layout === 'ruins' ? 'Ancient Ruins cleared' : 'Guardian defeated'
+    modal(title, `<p>Every column cleared. Recover up to 3 HP and face ${encounters[game.stage + 1].name}.</p>
       <button class="primary" data-action="advance">Continue</button>`, true)
   }
   if (game.phase === 'victory') {
-    modal('The gate is open', `<p>You cleared ${game.stage + 1} encounters. Your longest streak was ${game.best}.</p>
+    modal('The gate is open', `<p>Your longest streak was ${game.best}.</p>
       <button class="primary" data-action="start">Play again</button>`, true)
   }
   if (game.phase === 'defeat') {
@@ -251,9 +293,12 @@ document.addEventListener('click', event => {
   if (action === 'help') {
     modal('How to play', `<ol>
       <li>Match exposed cards one rank above or below the active card. The loop runs 8, 9, 1/10, 2, 3. Clear all seven columns to win an encounter.</li>
-      <li>Matching or drawing a card, including the opening card, earns 1 energy of its suit. Each power button shows the energy you have and the amount it costs. Equip gives another suit 1 energy. Tap that suit’s icon to choose it.</li>
+      <li>Matching or drawing a suited card, including the opening card, earns 1 energy of its suit. Each power button shows the energy you have and the amount it costs. Equip gives another suit 1 energy. Tap that suit’s icon to choose it.</li>
       <li>Tap a suit to activate its power. Choose an exposed card to remove with Strike. Cleave and Perceive activate immediately. Recover heals 1 HP. Dazzle protects your next draw.</li>
-      <li>Every draw breaks your streak and triggers the guardian’s attack. You start the run with 10 HP.</li>
+      <li>A shield absorbs the first match or Strike. A blood drop costs 1 HP on a match. Strike removes blood-drop cards safely.</li>
+      <li>Each exposed bomb costs 1 HP at the end of every turn. Remove it or cover it to stop the damage. In Ancient Ruins, draws place a card on a random column and leave the active card in place.</li>
+      <li>Jokers match any card. The Fool becomes the active card and matches any card next. The Door lets you leave for the next encounter.</li>
+      <li>Every draw breaks your streak and can cost HP. You start the run with 10 HP.</li>
       <li>Each match after the fifth earns gold equal to your current streak minus five.</li>
     </ol><button class="primary" data-action="close">Back to game</button>`)
     return
@@ -269,9 +314,9 @@ document.addEventListener('click', event => {
     target = undefined
     return render(`power-${lastTarget}`)
   }
-  if (action === 'start' || action === 'advance') {
+  if (action === 'start' || action === 'advance' || action === 'stay') {
     if (action === 'start') game = newGame()
-    else if (!advance(game)) return
+    else if (!(action === 'advance' ? advance(game) : stayInEncounter(game))) return
     dialogs.querySelector('dialog')?.remove()
     target = undefined
     powerInfo = undefined
